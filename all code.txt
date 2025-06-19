@@ -1,0 +1,815 @@
+
+
+
+Lex name.l
+Cc lex.yy.cc -ll
+./a.out
+
+
+
+
+Yacc
+
+Lex name.l
+Yacc -d name.y
+cc lex.yy.c y.tab.c -ll 
+./a.out
+
+
+1a.l
+
+%{
+#include<stdio.h>
+int lines=0,chars=0,words=0,spaces=0;
+%}
+%%
+\n	{lines++;} 
+\t	{spaces+=4;}
+[ ]	{spaces++;}
+[^ \t\n#]+ {words++;chars+=yyleng;} //[^ \t\n#] not space, tab, line, #
+# {return 0;}
+%%
+int yywrap()
+{
+	return 1;
+}
+int main()
+{
+	printf("Enter the string to count lines, words, chars, spaces:\n");
+	yylex();
+	printf("Lines: %d\nWords: %d\nChars: %d\nSpaces: %d\n",lines,words,chars,spaces);
+	return 0;
+}
+	
+
+1b.l
+
+%{
+#include "y.tab.h"
+%}
+%%
+"a"	{return 'a';}
+"b"	{return 'b';}
+"c" {return 'c';}
+.	{return yytext[0];}
+\n	{return 0;}
+%%
+
+
+
+1b.y
+
+%{
+#include<stdio.h>
+#include<stdlib.h>
+int yyerror();
+int yylex();
+%}
+%%
+S:A B
+;
+A:'a'A'b'
+|
+;
+B:'b'B'c'
+|
+;
+%%
+int main()
+{
+	printf("Enter the input to recognize the pattern a^n b^m+n c^m:\n");
+	yyparse();
+	printf("Valid string\n");
+}
+int yyerror()
+{
+	printf("Invalid string\n");
+	exit(0);	
+}
+
+
+
+2a.l
+
+%{
+#include <stdio.h>
+int p = 0, n = 0, pf = 0, nf = 0;
+%}
+%%
+end                        { return 0; }
+[+]?[0-9]+                 { p++; }          // Positive integer
+-[0-9]+                    { n++; }          // Negative integer
+[+]?[0-9]*\.[0-9]+         { pf++; }         // Positive fraction
+-[0-9]*\.[0-9]+            { nf++; }         // Negative fraction
+[ \t\n]+                   ;                 // Ignore whitespace
+.                          ;                 // Ignore other characters
+%%
+int main() {
+    printf("Enter numbers (type 'end' to finish):\n");
+    yylex();
+    printf("Positive integers: %d\n", p);
+    printf("Negative integers: %d\n", n);
+    printf("Positive fractions: %d\n", pf);
+    printf("Negative fractions: %d\n", nf);
+    return 0;
+}
+
+
+
+
+2b.l
+
+%{
+	#include "y.tab.h"
+	extern YYSTYPE yylval;
+%}
+%%
+[0-9]+	{yylval=atoi(yytext);return NUM;}
+[-+*/]	{return yytext[0];}
+.	{return yytext[0];}
+\n 	{return 0;}
+%%
+
+
+
+2b.y
+
+%{
+	#include<stdio.h>
+	#include<stdlib.h>		
+	int yylex();
+	int yyerror();
+%}
+%token NUM
+%left '+' '-'
+%left '/' '*'
+%%
+S:I {printf("Result is %d\n",$$);}
+;
+I:I'+'I 	{$$=$1+$3;}
+|I'-'I 		{$$=$1-$3;}
+|I'*'I 		{$$=$1*$3;}
+|I'/'I 		{if($3==0){yyerror();}	else{$$=$1/$3;}}
+|'('I')'	{$$=$2;}
+|NUM		{$$=$1;}
+|'-'NUM		{$$=-$2;}
+;
+%%
+int main()
+{
+	printf("Enter operation (+,-,*,/):\n");
+	yyparse();
+	printf("Valid\n");
+	return 0;
+}
+int yyerror()
+{
+	printf("Invalid\n");
+	exit(0);
+}
+
+
+
+3a.l
+
+%{
+#include <stdio.h>
+int single = 0, multi = 0, mlines = 0;
+FILE *commentFile;
+%}
+%%
+"//".*        {
+                single++;
+                fprintf(commentFile, "%s\n", yytext);
+            }
+"/*"([^*]|\*+[^/])*\*+"/" {
+                multi++;
+                for (int i = 0; i < yyleng; i++) {
+                    if (yytext[i] == '\n') mlines++;
+                }
+                fprintf(commentFile, "%s\n", yytext);
+            }
+.|\n          {
+                fprintf(yyout, "%s", yytext);
+            }
+%%
+int yywrap() {
+    return 1;
+}
+int main() {
+    yyin = fopen("ip.txt", "r");
+    yyout = fopen("op.txt", "w");
+    commentFile = fopen("comm.txt", "w");
+    if (!yyin || !yyout || !commentFile) {
+        printf("Error opening files.\n");
+        return 1;
+    }
+    yylex();
+    printf("Single-line comments: %d\n", single);
+    printf("Multi-line comments: %d\n", multi);
+    printf("Lines in multi-line comments: %d\n", mlines);
+    fclose(yyin);
+    fclose(yyout);
+    fclose(commentFile);
+    return 0;
+}
+
+
+
+ip.txt:
+#include <stdio.h>
+// This is a single-line comment
+int main() {
+    printf("Hello, World!\n");
+    /* This is a 
+       multi-line comment
+       explaining the code 
+    */
+    return 0; // End of main
+    /* This is a 
+       multi-line comment */
+}
+
+
+
+
+
+3b.l
+
+
+%{
+	#include "y.tab.h"
+%}
+%%
+"for" return FOR;
+[a-zA-Z]* return IDEN;
+[0-9]+ return NUM;
+[\n ]  ;
+.   return yytext[0];
+%%
+
+
+
+
+3b.y
+
+%{
+	#include<stdio.h>
+	#include<stdlib.h>
+	int cnt=0;
+%}
+%token FOR IDEN NUM
+%%
+S:I
+;
+I:FOR A B	{cnt++;}
+;
+A:'('E';'E';'E')'
+;
+E:IDEN Z IDEN
+|IDEN Z NUM
+|IDEN U
+|IDEN
+;
+Z:'='|'>'|'<'|'<''='|'>''='|'=''+'|'=''-'
+;
+U:'+''+'|'-''-' 
+;
+B:B B
+|'{' B '}'
+|I
+|E';'
+|
+;
+%%
+int main()
+{
+	printf("Enter the snippet of FOR Loop's:\n");
+	yyparse();
+	printf("Count of for : %d\n",cnt);
+	return 0;
+}
+int yyerror()
+{
+	printf("Invalid\n");
+	exit(0);
+}
+
+
+
+o/p:
+for(i=0;i<2;i++){for(j=0;j<4;j++){for(k=0;k<3;k++) c;}}
+
+
+
+4a.l
+
+%{
+#include <stdio.h>
+#include <string.h>
+int id=0, op=0, kw=0;
+char *kws[] = {"int","if","else","for","while","return","main","void"};
+int iskw(char *s) { for(int i=0;i<8;i++) if(!strcmp(s,kws[i])) return 1; return 0; }
+%}
+%%
+[a-zA-Z_][a-zA-Z0-9_]*   { iskw(yytext)? kw++ : id++; }
+[+\-*/=<>!]=?|==        { op++; }
+[ \t\n0-9]+              ;     // ignore
+.                        ;     // ignore
+%%
+int main() {
+  printf("Enter input to count id, op, kw(Ctrl+D to end):\n");
+  yylex();
+  printf("Identifiers: %d\nOperators: %d\nKeywords: %d\n",id,op,kw);
+  return 0;
+}
+
+
+
+
+4b.l
+
+%{
+#include "y.tab.h"
+%}
+
+%%
+"if"        { return IF; }
+">"|"<"|">="|"<="|"=="|"!=" return OP;
+[a-zA-Z][a-zA-Z0-9]* { return IDEN; }
+[0-9]+      { return NUM; }
+[ \t\n]+    ; 
+.           { return yytext[0]; }
+%%
+
+int yywrap() {
+    return 1;
+}
+
+
+
+4b.y
+
+%{
+    #include <stdio.h>
+    #include <stdlib.h>
+    int total_if_count = 0;
+    int current_nesting = 0;
+    int max_nesting = 0;
+    int yylex();
+    int yyerror(const char *s);
+%}
+%token IF IDEN NUM OP
+%%
+STMTS: STMT
+     | STMTS STMT
+     ;
+STMT: IFSTMT
+    | IDEN '=' EXPR ';'
+    | IDEN ';'
+    | '{' STMTS '}'
+    | ';'
+    ;
+IFSTMT: IF '(' COND ')' 
+            {
+                total_if_count++;
+                current_nesting++;
+                if (current_nesting > max_nesting) {
+                    max_nesting = current_nesting;
+                }
+            }
+            STMT
+            {
+                current_nesting--;
+            }
+            ;
+COND: IDEN OP IDEN
+         | IDEN OP NUM
+         | IDEN
+         | NUM
+         ;
+EXPR: IDEN
+          | NUM
+          | IDEN '+' IDEN
+          | IDEN '-' IDEN
+          ;
+%%
+int main() {
+    printf("Enter the code snippet of IF stmt's (Ctrl+D to end input):\n");
+    yyparse();
+    printf("\nTotal IF STMTS: %d\n", total_if_count);
+    printf("Maximum nesting level: %d\n", max_nesting);
+    return 0;
+}
+int yyerror(const char *s) {
+    fprintf(stderr, "Parse error: %s\n", s);
+    exit(1);
+}
+
+
+o/p:
+
+if (x == y)
+{
+    z = 1;
+}
+
+if (a == b)
+{
+    if (b == c)
+    {
+        if (c == d)
+            x = 5;
+    }
+}
+
+
+
+
+5.c
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+int i=0,j=0,k=0,l=0,r=0;
+char inp[30],arr[30],stk[30],temp[30];
+void dispstk()
+{
+    printf("\n");
+    for(k=0;k<strlen(stk);k++)
+        printf("%c",stk[k]);
+}
+void dispinp()
+{
+    printf("\t\t\t");
+    for(k=0;k<strlen(inp);k++)
+        printf("%c",inp[k]);
+    printf("$");
+}
+void assign()
+{
+    stk[++j]=arr[i];
+    inp[i]=' ';
+    dispstk();
+    dispinp();
+}
+int main()
+{
+    printf("Grammer: E -> E+E | E-E | E*E | i\n");
+    printf("Enter the string:\n");
+    gets(inp);
+    for(k=0;k<strlen(inp);k++)
+        arr[k]=inp[k];
+    stk[0]='$';
+    printf("Stack\t\t\tInput\t\t\tAction\n");
+    dispstk();
+    dispinp();
+    printf("\t\t\tShift");
+    for(i=0;i<strlen(arr);i++)
+    {
+        switch(arr[i])
+        {
+            case 'i':
+                assign();
+                printf("\t\t\tReduce by E->i");
+                stk[j]='E';
+                dispstk();
+                dispinp();
+                if(arr[i+1]!='\0')
+                    printf("\t\t\tShift");
+                break;
+            case '+':
+            case '-':
+            case '*':
+                assign();
+                printf("\t\t\tShift");
+                break;
+            default:
+                printf("\nString not accepeted\n");
+                return 0;
+        }
+    }
+    l=strlen(stk);
+    while(l>2)
+    {
+        r=0;
+        for(k=l-1;k>=l-3;k--)
+        {
+            temp[r]=stk[k];
+            r++;
+        }
+        if(strcmp(temp,"E+E")==0 || strcmp(temp,"E-E")==0 || strcmp(temp,"E*E")==0)
+        {
+            for(k=l-1;k>=l-3;k--)
+            {
+                stk[k]=' ';
+            }
+            stk[l-3]='E';
+            printf("\t\t\tReduce by E->");
+            for(k=0;k<3;k++)
+                printf("%c",temp[k]);  
+            dispstk();
+            dispinp();  
+        }
+        else
+        {
+            printf("\nString not accepted\n");
+            return 0;
+        }
+        l-=2;
+    }
+    printf("\t\t\tAccept");
+    printf("\nString accepted\n");
+    return 0;
+}
+
+
+
+
+6.l
+
+%{
+#include <string.h>
+#include "y.tab.h"
+%}
+%%
+[a-zA-Z_][a-zA-Z_0-9]* {
+	yylval.exp = strdup(yytext);
+	return IDEN;
+}
+[0-9]+ {
+	yylval.exp = strdup(yytext);
+	return NUM;
+}
+[-+*/] return yytext[0];
+[()=] return yytext[0];
+[\n]+ return '\n';
+[ \t]+ ;
+. ;
+%%
+
+
+
+6.y
+
+%{
+#include <stdio.h>
+#include <stdlib.h>
+int yylex();
+int yyerror();
+extern FILE *yyin; // optional
+typedef char *string;
+struct {
+	string res, op1, op2;
+	char op;
+} code[100];
+int idx = -1;
+string addToTable(string, string, char);
+void threeAddressCode();
+void quadruples();
+%}
+%union {
+	char *exp;
+}
+%token <exp> IDEN NUM
+%type <exp> EXP
+%right '='
+%left '+' '-'
+%left '*' '/'
+%%
+STMTS	: STMTS STMT
+	|
+	;
+STMT	: EXP '\n'
+	;
+EXP : IDEN '=' EXP { $$ = addToTable($1, $3, '='); }
+    | EXP '+' EXP { $$ = addToTable($1, $3, '+'); }
+    | EXP '-' EXP { $$ = addToTable($1, $3, '-'); }
+    | EXP '*' EXP { $$ = addToTable($1, $3, '*'); }
+    | EXP '/' EXP { $$ = addToTable($1, $3, '/'); }
+    | '(' EXP ')' { $$ = $2; }
+    | IDEN { $$ = $1; }
+    | NUM { $$ = $1; }
+    ;
+%%
+int yyerror() {
+	printf("Error");
+	exit(0);
+}
+int main() {
+    FILE *f = fopen("inputnew.txt", "r");
+    if (!f) {
+        printf("Cannot open inputnew.txt\n");
+        return 1;
+    }
+    yyin = f;  // read input from the file
+    yyparse();
+    fclose(f);
+    printf("\nThree address code:\n");
+    threeAddressCode();
+    printf("\nQuadruples:\n");
+    quadruples();
+    return 0;
+}
+string addToTable(string op1, string op2, char op) {
+	if(op == '=') {
+		code[idx].res = op1;
+		return op1;
+	}
+	idx++;
+	string res = malloc(3);
+	sprintf(res, "@%c", idx + 'A');
+	code[idx].op1 = op1;
+	code[idx].op2 = op2;
+	code[idx].op = op;
+	code[idx].res = res;
+	return res;
+}
+void threeAddressCode() {
+	for(int i = 0; i <= idx; i++) {
+		printf("%s = %s %c %s\n", code[i].res, code[i].op1, code[i].op, code[i].op2);
+	}
+}
+void quadruples() {
+    printf("Index\tOp\tArg1\tArg2\tResult\n");
+    for (int i = 0; i <= idx; i++) {
+        printf("%d\t%c\t%s\t%s\t%s\n", i, code[i].op, code[i].op1, code[i].op2, code[i].res);
+    }
+}
+
+inputnew.txt:
+a = b + c
+d = a * e
+b=d/e*a
+
+
+
+
+
+7.l
+
+%{
+    #include "y.tab.h"
+%}
+%%
+[\t\n ] ;
+"int"|"float"|"char"|"void" {return TYPE;}
+[a-zA-Z][a-zA-Z0-9_]* {return IDEN;}
+[0-9]+ {return NUM;}
+. {return yytext[0];}
+%%
+
+
+
+7.y
+
+%{
+    #include<stdio.h>
+    #include<stdlib.h>
+    int yyerror();
+    int yylex();
+%}
+
+%token TYPE IDEN NUM
+%left '+' '-'
+%left '*' '/'
+
+%%
+
+S: FUN  { printf("Accepted\n"); exit(0); } ;
+FUN: TYPE IDEN '(' PARAMS ')' BODY ;
+BODY: S1';' | '{'SS'}'
+PARAMS: PARAM','PARAMS | PARAM | ;
+PARAM:  TYPE IDEN;
+SS: S1';'SS | ;
+S1: ASSGN | E | DECL ;
+DECL: TYPE IDEN | TYPE ASSGN ;
+ASSGN : IDEN '=' E ;
+E : E '+' E | E '-' E | E '*' E | E '/' E | '-''-'E | '+''+'E | E'+''+' | E'-''-' | T ;
+T : NUM | IDEN ;
+%%
+int main()
+{
+    printf("enter input to identify function definition:\n");
+    yyparse();
+    printf("successfull\n");
+    return 0;
+}
+int yyerror()
+{
+    printf("ERROR\n");
+    exit(0);
+}
+
+
+
+8.l
+
+%{
+#include <string.h>
+#include "y.tab.h"
+%}
+%%
+
+[a-zA-Z_][a-zA-Z_0-9]* {
+	yylval.exp = strdup(yytext);
+	return IDEN;
+}
+[0-9]+ {
+	yylval.exp = strdup(yytext);
+	return NUM;
+}
+[-+*/] return yytext[0];
+[()=] return yytext[0];
+[\n]+ return '\n';
+[ \t]+ ;
+. ;
+%%
+
+
+
+8.y
+
+%{
+#include <stdio.h>
+#include <stdlib.h>
+int yylex();
+int yyerror();
+
+//extern FILE *yyin;
+
+typedef char *string;
+struct {
+	string res, op1, op2;
+	char op;
+} code[100];
+int idx = -1;
+string addToTable(string, string, char);
+void targetCode();
+%}
+%union {
+	char *exp;
+}
+%token <exp> IDEN NUM
+%type <exp> EXP
+%left '+' '-'
+%left '*' '/'
+%%
+
+STMTS	: STMTS STMT
+	|
+	;
+
+STMT	: EXP '\n'
+	;
+EXP	: EXP '+' EXP { $$ = addToTable($1, $3, '+'); }
+	| EXP '-' EXP { $$ = addToTable($1, $3, '-'); }
+	| EXP '*' EXP { $$ = addToTable($1, $3, '*'); }
+	| EXP '/' EXP { $$ = addToTable($1, $3, '/'); }
+	| '(' EXP ')' { $$ = $2; }
+	| IDEN '=' EXP { $$ = addToTable($1, $3, '='); }
+	| IDEN { $$ = $1; }
+	| NUM { $$ = $1; }
+	;
+%%
+
+int yyerror(const char *s) {
+	printf("Error %s", s);
+	exit(0);
+}
+int main() {
+	 //yyin = fopen("8.txt", "r");
+	 printf("Enter expressions for assembly language(end with Ctrl+D):\n");
+         yyparse();
+	printf("\nTarget code:\n");
+	targetCode();
+}
+string addToTable(string op1, string op2, char op) {
+	if(op == '=') {
+		code[idx].res = op1;
+		return op1;
+	}
+	idx++;
+	string res = malloc(3);
+	sprintf(res, "@%c", idx + 'A');
+	code[idx].op1 = op1;
+	code[idx].op2 = op2;
+	code[idx].op = op;
+	code[idx].res = res;
+	return res;
+}
+void targetCode() {
+	for(int i = 0; i <= idx; i++) {
+		string instr;
+		switch(code[i].op) {
+		case '+': instr = "ADD"; break;
+		case '-': instr = "SUB"; break;
+		case '*': instr = "MUL"; break;
+		case '/': instr = "DIV"; break;
+		}
+		printf("LOAD\t R1, %s\n", code[i].op1);
+		printf("LOAD\t R2, %s\n", code[i].op2);
+		printf("%s\t R3, R1, R2\n", instr);
+		printf("STORE\t %s, R3\n", code[i].res);
+	}
+}
